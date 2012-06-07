@@ -1,0 +1,36 @@
+Gestión de usuarios y permisos
+
+Después de darle algunas vueltas, he decidido aplicar el mismo sistema que utiliza Unix para gestionar los permisos del sistema de ficheros. Si ha funcionado durante más de 40 años en este sistema, porque no va a funcionar para el nuestro.
+
+1. Los recursos
+===============
+
+   En nuestro caso los recursos, son los contenidos del sitio web, y para definir los permisos de acceso, será necesario que cada contenido tenga un propietario, pertenezca a un grupo y tenga definidos unos modificadores de acceso.
+   
+   > owner : El (usuario) propietario del recurso. 
+   > group : El (grupo) propietario del recurso.
+   > modificadores : Indican los permisos de acceso al recurso por parte del owner, de su grupo y de todo el mundo.
+   
+     En nuestro caso será un String de 3 posicione : [owner, group, all] y el valor posible para cada una de ellas será :
+     (R)ead : Lectura
+     (W)rite : Escritura
+     (A)ll : Lectura y escritura
+   
+   De esta forma, cuando se acceda a cualquier recurso, se podrá validar si el usuario que está accediendo tiene permiso para hacerlo.  
+     
+   ¿Cuáles son los recursos que vamos a proteger?
+   ---------------------------------------------- 
+     
+
+     
+2. Los usuarios y los grupos
+============================
+
+   Un usuario es cualquier persona o sistema que accede a nuestro sitio web. Existen usuarios "anónimos" que acceden al contenido público y usuarios identificados, que habrán realizado login en el sistema.
+   
+   En el sistema existe un usuario root, o superusuario, que podrá realizar determinadas tareas críticas y asignar permiso de superusuario a otros usuarios.
+   
+   Los usuarios pueden pertenecer a múltiples grupos, y esto determinará entre otras cosas a qué recursos pueden acceder.
+   
+
+
