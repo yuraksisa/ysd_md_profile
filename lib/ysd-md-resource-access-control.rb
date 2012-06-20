@@ -6,8 +6,6 @@ module Users
   # If we want to control the access to a resource we only have to include this module in the
   # resource
   #
-  # It works on DataMapper and YSDPersistence
-  #
   # By default a resource can be read/write by the owner, read by the group and not allowed by the others
   #
   # We have created three properties to represents each of the permission modifiers to make the query process easy
@@ -24,18 +22,21 @@ module Users
   #
   #
   module ResourceAccessControl
-
-      #
-      # When the resource is included
-      #
-      def self.included(model)
+         
+      def self.prepare_model(model)
 
         model.property :permission_owner, String, :field => 'permission_owner', :length => 32
         model.property :permission_group, String, :field => 'permission_group', :length => 32
         model.property :permission_modifier_owner, Integer, :field => 'permission_modifier_owner', :default => 6
         model.property :permission_modifier_group, Integer, :field => 'permission_modifier_group', :default => 2
         model.property :permission_modifier_all, Integer, :field => 'permission_modifier_all', :default => 0
-  
+         
+        model.class_eval do
+          class << self 
+             alias_method :original_all, :all
+          end
+        end         
+         
       end
   
       #
@@ -63,47 +64,7 @@ module Users
         can_access?(profile, [4,6])
       
       end
-  
-      
-      #
-      # Create the query conditions to access the resource
-      #
-      # @params [Profile]
-      #
-      #  the user profile we can check
-      #
-      # @return [Array]
-      #
-      #  Array which contains the set of OR conditions which have to be matched to access the resource
-      #
-      #
-      def query_conditions(profile)
-      
-        conditions = []
-      
-        if profile
-       
-          conditions_owner = {}      
-          conditions_owner.store(:permission_owner => profile)
-          conditions_owner.store(:permission_modifier_owner => [2,6])
-          
-          conditions << conditions_owner        
-       
-          conditions_group = {}        
-          conditions_group.store(:permission_group => profile.groups.split(','))
-          conditions_group.store(:permission_modifier_group => [2,6])
-     
-          conditions << conditions_group
-        
-        end
-        
-        conditions_all = {}        
-        conditions_all.store(:permission_modifier_all => [2,6])
-        conditions << conditions_all
-        
-        conditions 
-      end
-      
+              
       private
       
       #
@@ -127,14 +88,85 @@ module Users
         can_access = options.include(attribute_get(:permission_modifier_all)) 
         
         if profile and not can_access
-           can_access = (options.include(attribute_get(:permission_modifier_group)) and profile.groups.split(',').include(permission_group)) or
+           can_access = (options.include(attribute_get(:permission_modifier_group)) and profile.usergroups.index(permission_group)) or
                         (options.include(attribute_get(:permission_modifier_owner)) and profile == attribute_get(:permission_owner))
         end
         
         can_access
             
       end
-      
        
   end # ResourceAccessControl
+
+  #
+  # ResourceAccessControl for DataMapper
+  #
+  module ResourceAccessControlDataMapper
+    include ResourceAccessControl
+    
+      #
+      # When the resource is included
+      #
+      def self.included(model)    
+     
+        ResourceAccessControl.prepare_model(model)
+        model.extend(AccessControlConditionsAppenderDataMapper)  
+     
+     end
+           
+  end # ResourceAccessControlDataMapper
+  
+  
+  #
+  # ResourceAccessControl for Persistence System
+  #
+  module ResourceAccessControlPersistence
+    include ResourceAccessControl
+    
+      #
+      # When the resource is included
+      #
+      def self.included(model)    
+        
+        ResourceAccessControl.prepare_model(model) 
+        model.extend(AccessControlConditionsAppenderPersistence)   
+     
+     end    
+    
+     #
+     # Updates the resource access control information if not has been set
+     #
+     def create
+     
+      profile = connected_user
+      
+      if connected_user and (attribute_get(:permission_owner).nil? or attribute_get(:permission_owner).to_s.strip.length == 0)
+        attribute_set(:permission_owner, connected_user.username) 
+      end
+
+      if connected_user and connected_user.usergroups.length > 0 and (attribute_get(:permission_group).nil? or attribute_get(:permission_group).to_s.strip.length == 0)
+        attribute_set(:permission_group, connected_user.usergroups.first) 
+      end
+
+      if attribute_get(:permission_modifier_owner).nil? or attribute_get(:permission_modifier_owner).to_s.strip.length == 0      
+        attribute_set(:permission_modifier_owner, 6) 
+      end
+      
+      if attribute_get(:permission_modifier_group).nil? or attribute_get(:permission_modifier_group).to_s.strip.length == 0
+        attribute_set(:permission_modifier_group, 2) 
+      end
+      
+      if attribute_get(:permission_modifier_all).nil? or attribute_get(:permission_modifier_all).to_s.strip.length == 0
+        attribute_set(:permission_modifier_all, 2) 
+      end
+      
+      super
+     
+     end
+     
+    
+        
+  end # ResourceAccessControlPersitence
+
+  
 end #Users

@@ -35,9 +35,63 @@ module Users
     property :last_access          # The last access to the system
     
     property :superuser            # It's a superuser
-    property :groups               # A comma separated list of the group which he/she belongs to
+    property :usergroups           # An array with the list of the group which he/she belongs to
     
-    # Login the user checking its password
+    # ================= Class methods ====================
+    
+    #
+    # Finds all profiles
+    #
+    def self.find_all(count=true)
+    
+      result = []
+    
+      result << Users::Profile.all
+      
+      if count
+        result << Users::Profile.count
+      end
+      
+      if result.length == 1
+        result = result.first
+      end
+      
+      result
+    
+    end
+    
+    #
+    # Find profiles excluding us
+    #
+    # @param [String] the username which has to be excluded
+    # @param [Numeric] limit
+    # @param [Numeric] offset
+    #
+    # @return [Array] 
+    #
+    #   The first element is the profile subset limited by limit, offset
+    #   The second element is the total number of profiles which matches
+    #
+    def self.find_other_profiles(username, limit, offset)
+    
+        # Query for the profiles
+        conditions = Conditions::Comparison.new(:username, '$ne', username)
+         
+        result = [] 
+         
+        result << Users::Profile.all(:conditions => conditions, 
+                                     :order=>[['photo.path',:desc]], 
+                                     :limit => limit , 
+                                     :offset => offset)    
+    
+        result << Users::Profile.count(:conditions => conditions)
+
+        result
+    
+    end
+    
+    #
+    # Login the user 
     #
     # @param [String] username
     # @param [String] password
@@ -58,32 +112,7 @@ module Users
       user
     end
 
-    # Overwritten to hash the password
     #
-    def initialize(path, metadata={})
-      super(path, metadata)    
-      if (attribute_get(:password))
-        set_password(attribute_get(:password))
-      end    
-    end
-  
-    # Overwritten to hash the password 
-    #
-    def attribute_set(name, value)  
-      if (name.to_sym == :password)
-        set_password(value)
-      else
-        super(name, value)
-      end    
-    end
-  
-    # Overwritten to store auditory data
-    #
-    def create
-      attribute_set(:creation_date, Time.now)
-      super
-    end 
-    
     # Profile signup (creates a new profile through the signup process)
     # 
     #
@@ -116,7 +145,7 @@ module Users
     #    
     def self.reset_password!(email)
      
-      profile = Profile.all({:conditions => {:email => email}}).first
+      profile = Profile.all({:conditions => Conditions::Comparison.new(:email, '$eq', email)}).first
      
       if (profile)
   
@@ -134,7 +163,50 @@ module Users
       end
       
     end    
-      
+    
+    # Check if the email is registered in the system
+    #
+    # @param [String] email
+    #   The user email
+    #
+    # @return [Boolean]
+    #   If the mail is registered or not in the system
+    #
+    #
+    def self.email_registered?(email)
+    
+      Users::Profile.all(:fields=>[:email], :conditions=> Conditions::Comparison.new(:email, '$eq', email), :limit => 1).length>0
+     
+    end
+
+    # =================================================
+
+    # Overwritten to hash the password
+    #
+    def initialize(path, metadata={})
+      super(path, metadata)    
+      if (attribute_get(:password))
+        set_password(attribute_get(:password))
+      end    
+    end
+  
+    # Overwritten to hash the password 
+    #
+    def attribute_set(name, value)  
+      if (name.to_sym == :password)
+        set_password(value)
+      else
+        super(name, value)
+      end    
+    end
+  
+    # Overwritten to store auditory data
+    #
+    def create
+      attribute_set(:creation_date, Time.now)
+      super
+    end 
+          
     #
     # Calculates the age
     #
@@ -178,6 +250,21 @@ module Users
     
     end
     
+    #
+    # Gets the usergroups (make sure return array)
+    #
+    def usergroups
+    
+      value = attribute_get(:usergroups)
+      
+      if not value.kind_of?(Array)
+        value = []
+      end
+      
+      value
+   
+    end
+    
     # Serializes the object to json
     # Avoid sending the password and some problematic information
     # 
@@ -186,6 +273,7 @@ module Users
       remove_attributes = [:password] 
       data = attributes.reject do |key, value| remove_attributes.index(key) end
       data.store(:age, age)
+      data.store(:usergroups, usergroups)
     
       data.to_json
   
