@@ -34,6 +34,7 @@ module Users
         model.class_eval do
           class << self 
              alias_method :original_all, :all
+             alias_method :original_count, :count
           end
         end         
          

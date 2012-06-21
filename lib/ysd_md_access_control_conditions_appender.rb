@@ -100,6 +100,37 @@ module Users
         #
         def all(options = {})
 
+          puts "building options for all"
+          
+          upgraded_options = build_access_control_conditions(options)
+          
+          puts "all options : #{upgraded_options.inspect}"
+          
+          # Retrieve the data        
+          original_all(upgraded_options)                  
+
+        end         
+         
+        def count(options = {})
+        
+          puts "building options for count"
+
+          upgraded_options = build_access_control_conditions(options)
+          
+          puts "count options : #{upgraded_options.inspect}"
+
+          count = original_count(upgraded_options)
+        
+          puts "count : #{count}"
+        
+          count
+          
+        end
+        
+        private
+        
+        def build_access_control_conditions(options)
+        
           # Get the access control conditions
           ac_conditions = access_control_conditions
           
@@ -115,13 +146,10 @@ module Users
        
           upgraded_options = options.dup
           upgraded_options.store(:conditions, conditions)
+        
+          upgraded_options
           
-          puts "options : #{upgraded_options.inspect}"
-          
-          # Retrieve the data        
-          original_all(upgraded_options)                  
-
-        end         
+        end 
          
    end
 end
