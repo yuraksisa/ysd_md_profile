@@ -1,4 +1,5 @@
-require 'ysd_md_system' unless defined?YSD::System::Request
+require 'ysd_md_system' unless defined?Model::System::Request
+require 'ysd_md_comparison' unless defined?Conditions::Comparison
 
 module Users
 
@@ -12,7 +13,7 @@ module Users
   # Not use this module directly. Use your concrete ORM implementation
   #
   module AccessControlConditionsAppender
-      include YSD::System::Request
+      include Model::System::Request
                 
         #
         # Create the query conditions to access the resource
@@ -34,7 +35,7 @@ module Users
       
           if profile
        
-            conditions_owner = Conditions.JoinComparison.new('$and', 
+            conditions_owner = Conditions::JoinComparison.new('$and', 
                                  [Conditions::Comparison.new(:permission_owner, '$eq', profile.username),
                                   Conditions::Comparison.new(:permision_modifier_owner, '$in', [2,6])])
           
@@ -42,7 +43,7 @@ module Users
        
             if (profile_groups=profile.usergroups).length > 0
        
-              conditions_group = Conditions.JoinComparison.new('$and',
+              conditions_group = Conditions::JoinComparison.new('$and',
                                    [Conditions::Comparison.new(:permission_group, '$in', profile_groups),
                                     Conditions::Comparison.new(:permission_modifier_group, '$in', [2,6])])    
             
