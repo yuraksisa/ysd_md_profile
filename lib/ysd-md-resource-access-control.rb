@@ -86,11 +86,11 @@ module Users
       #
       def can_access?(profile, options)
       
-        can_access = options.include(attribute_get(:permission_modifier_all)) 
+        can_access = options.include?(attribute_get(:permission_modifier_all)) 
         
         if profile and not can_access
-           can_access = (options.include(attribute_get(:permission_modifier_group)) and profile.usergroups.index(permission_group)) or
-                        (options.include(attribute_get(:permission_modifier_owner)) and profile == attribute_get(:permission_owner))
+           can_access = (options.include?(attribute_get(:permission_modifier_group)) and Array(profile.usergroups).include?(permission_group)) or
+                        (options.include?(attribute_get(:permission_modifier_owner)) and profile.username == attribute_get(:permission_owner))
         end
         
         can_access
