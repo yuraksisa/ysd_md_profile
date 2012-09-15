@@ -85,15 +85,18 @@ module Users
       #
       #
       def can_access?(profile, options)
-      
-        can_access = options.include?(attribute_get(:permission_modifier_all)) 
         
-        if profile and not can_access
-           can_access = (options.include?(attribute_get(:permission_modifier_group)) and Array(profile.usergroups).include?(permission_group)) or
-                        (options.include?(attribute_get(:permission_modifier_owner)) and profile.username == attribute_get(:permission_owner))
+        can_access_resource = options.include?(attribute_get(:permission_modifier_all)) 
+        
+        if profile and not can_access_resource
+           superuser_access = profile.is_superuser?
+           can_access_group = (options.include?(attribute_get(:permission_modifier_group)) and profile.usergroups.include?(attribute_get(:permission_group))) 
+           can_access_owner = (options.include?(attribute_get(:permission_modifier_owner)) and profile.username == attribute_get(:permission_owner))
+           
+           can_access_resource = (superuser_access or can_access_group or can_access_owner)
         end
         
-        can_access
+        return can_access_resource
             
       end
        
