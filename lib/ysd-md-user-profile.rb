@@ -1,5 +1,7 @@
 require 'ysd-persistence' if not defined?Persistence
 require 'md5' unless defined?Digest
+require 'ysd_md_comparison' unless defined?Conditions::Comparison
+require 'ysd_md_business_events' unless defined?BusinessEvents::BusinessEvent
 
 module Users
 

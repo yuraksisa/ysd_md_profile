@@ -1,7 +1,13 @@
 YSD_MD_PROFILE
 ==================
 
-0.2.0 (2012.09.17)
+0.2.0 
 ------------------
+
+2012.09.18
+
+- Remove access control from this gem. Now it's available on ysd_md_rac
+
+2012.09.17
 
 - Starting gem repository and git versioning
