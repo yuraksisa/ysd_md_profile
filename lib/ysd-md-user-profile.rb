@@ -1,7 +1,8 @@
 require 'ysd-persistence' if not defined?Persistence
-require 'md5' unless defined?Digest
+require 'digest/md5' unless defined?Digest
 require 'ysd_md_comparison' unless defined?Conditions::Comparison
-require 'ysd_md_business_events' unless defined?BusinessEvents::BusinessEvent
+require 'ysd-md-business_events' unless defined?BusinessEvents::BusinessEvent
+require 'ysd_core_plugins' unless defined?Plugins::ApplicableModelAspect
 
 module Users
 
@@ -19,26 +20,28 @@ module Users
   #
   class Profile
     include Persistence::Resource
+    include Plugins::ApplicableModelAspect         # Extends the entity to allow apply aspects
   
     alias :base_attribute_set :attribute_set
   
     # Defines the Profile properties
   
-    property :username             # The username
-    property :password             # The password (hashed)
-    property :email                # The user email
+    property :username, String             # The username
+    property :password, String             # The password (hashed)
+    property :salt, Object                 # Salt to check the password
+    property :email, String                # The user email
   
-    property :full_name            # Full name 
-    property :date_of_birth        # Date of birth
-    property :country_of_origin    # Country of origin
+    property :full_name, String            # Full name 
+    property :date_of_birth, DateTime      # Date of birth
+    property :country_of_origin, String    # Country of origin
   
-    property :preferred_language   # Preferred language
-    property :creation_date        # Creation date (auditory information)
-    property :last_access          # The last access to the system
+    property :preferred_language, String   # Preferred language
+    property :creation_date, DateTime      # Creation date (auditory information)
+    property :last_access, DateTime        # The last access to the system
     
-    property :superuser            # It's a superuser
-    property :usergroups           # An array with the list of the group which he/she belongs to
-    
+    property :superuser, Object            # It's a superuser
+    property :usergroups, Object           # An array with the list of the group which he/she belongs to
+        
     # ================= Class methods ====================
     
     #
@@ -102,10 +105,12 @@ module Users
     #
     def self.login(username, password)
       user = get(username)
+      
       # checks the password
       if user
         user = user.check_password(password)?user:nil
       end
+      
       # update the last access 
       if user
         user.attribute_set(:last_access, Time.now)

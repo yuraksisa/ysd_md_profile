@@ -8,10 +8,11 @@ Gem::Specification.new do |s|
   s.summary = "A model for user/profile management"
   s.homepage = "http://github.com/yuraksisa/ysd_md_profile"
     
-  s.add_runtime_dependency "data_mapper","1.1.0"  # Users::Group ORM
+  s.add_runtime_dependency "data_mapper","1.2.0"  # Users::Group ORM
   
   s.add_runtime_dependency "ysd-persistence"        # Users::Profile ORM
   s.add_runtime_dependency "ysd_md_business_events" # Business events   
   s.add_runtime_dependency "ysd_md_comparison"      # To build the conditions
+  s.add_runtime_dependency "ysd_core_plugins"       # Aspects
      
 end
