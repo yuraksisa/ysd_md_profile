@@ -2,7 +2,7 @@ require 'ysd-persistence' if not defined?Persistence
 require 'digest/md5' unless defined?Digest
 require 'ysd_md_comparison' unless defined?Conditions::Comparison
 require 'ysd-md-business_events' unless defined?BusinessEvents::BusinessEvent
-require 'ysd_core_plugins' unless defined?Plugins::ApplicableModelAspect
+require 'ysd-plugins' unless defined?Plugins::ApplicableModelAspect
 
 module Users
 
@@ -20,7 +20,7 @@ module Users
   #
   class Profile
     include Persistence::Resource
-    include Plugins::ApplicableModelAspect         # Extends the entity to allow apply aspects
+    extend Plugins::ApplicableModelAspect         # Extends the entity to allow apply aspects
   
     alias :base_attribute_set :attribute_set
   
@@ -253,8 +253,17 @@ module Users
     #
     def is_superuser?
     
-      attribute_get('superuser') || false
+      attribute_get('superuser') == true
     
+    end
+
+    #
+    # Check if the user belongs to the group(s)
+    #
+    def belongs_to?(usergroup)
+
+      usergroups.any? {|g| g == usergroup}
+
     end
     
     #
@@ -364,5 +373,9 @@ module Users
  
     end
    
+    public
+
+    ANONYMOUS_USER = new('anonymous', {:username => 'anonymous', :usergroups => ['anonymous']})
+
   end # Profile   
 end # Users
