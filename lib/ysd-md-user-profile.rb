@@ -3,6 +3,7 @@ require 'digest/md5' unless defined?Digest
 require 'ysd_md_comparison' unless defined?Conditions::Comparison
 require 'ysd-md-business_events' unless defined?BusinessEvents::BusinessEvent
 require 'ysd-plugins' unless defined?Plugins::ApplicableModelAspect
+require 'ysd_md_variable'
 
 module Users
 
@@ -34,6 +35,8 @@ module Users
     property :full_name, String            # Full name 
     property :date_of_birth, DateTime      # Date of birth
     property :country_of_origin, String    # Country of origin
+    property :sex, String                  # Sex (0-male, 1-female)
+    property :about_me, String             # About me (information)
   
     property :preferred_language, String   # Preferred language
     property :creation_date, DateTime      # Creation date (auditory information)
@@ -66,7 +69,7 @@ module Users
     end
     
     #
-    # Find profiles excluding us
+    # Find profiles excluding the username passed as argument
     #
     # @param [String] the username which has to be excluded
     # @param [Numeric] limit
@@ -126,8 +129,7 @@ module Users
     def self.signup(data)
   
       user_password = data['password']
-      data['superuser'] = false if not data['superuser']
-    
+      
       # Create the profile
       profile = Profile.new(data['username'], data)
       profile.create
@@ -136,9 +138,8 @@ module Users
       if defined?BusinessEvents
         BusinessEvents::BusinessEvent.fire_event(:profile_signup, {:username => profile.username, :password => user_password})
       end
-    
-      # Returns the profile
-      profile
+
+      return profile
   
     end  
     
@@ -191,12 +192,37 @@ module Users
     # Overwritten to hash the password
     #
     def initialize(path, metadata={})
-      super(path, metadata)    
-      if (attribute_get(:password))
-        set_password(attribute_get(:password))
+      
+      password = if metadata.has_key?(:password)
+                   metadata.delete(:password)
+                 else
+                   metadata.delete('password')
+                 end
+
+      super(path, metadata)
+      
+      if password
+        set_password(password)
       end    
+      
     end
   
+    def attributes=(attributes)
+
+      password = if attributes.has_key?(:password)
+                   attributes.delete(:password)
+                 else
+                   attributes.delete('password')
+                 end
+      
+      super(attributes)
+      
+      if password
+        attribute_set(:password, password)
+      end
+
+    end
+
     # Overwritten to hash the password 
     #
     def attribute_set(name, value)  
@@ -211,7 +237,17 @@ module Users
     #
     def create
       attribute_set(:creation_date, Time.now)
+
+      if superuser.nil? or superuser == ''
+        attribute_set(:superuser, false)
+      end
+
+      if usergroups.nil? or usergroups == []
+        attribute_set(:usergroups, SystemConfiguration::Variable.get_value('profile.default_group', 'user').split(",") ) 
+      end
+
       super
+    
     end 
           
     #
@@ -223,25 +259,28 @@ module Users
      
       age = nil    
      
-      if date_of_birth=attribute_get(:date_of_birth) 
-     
-        if date_of_birth.strip.length > 0
-     
+      if _date_of_birth=attribute_get(:date_of_birth) 
+        
+        if _date_of_birth.to_s.strip.length > 0
+
+          if _date_of_birth.is_a?(String)
+            _date_of_birth = Time.parse(_date_of_birth)
+          end
+
           base  = Time.utc(1970,1,1)
-          date  = Time.parse(date_of_birth) 
           today = Time.now.utc
           
-          if date >= base
-            age = Time.at(today-date).year-1970
+          if _date_of_birth >= base
+            age = Time.at(today-_date_of_birth).year-1970
           else   
-            before_t = Time.at(base-date)
-            after_t  = Time.at(today-base)
-            plus_1 = (date.month < today.month or (date.month == today.month and date.day <= today.day))?1:0 
+            before_t = Time.at(base-_date_of_birth)
+            after_t  = Time.at(today-_date_of_birth)
+            plus_1 = (_date_of_birth.month < today.month or (_date_of_birth.month == today.month and _date_of_birth.day <= today.day))?1:0 
             age = (before_t.year - 1970) + (after_t.year - 1970) + plus_1 
           end   
-       
+          
         end
-            
+
       end
  
       age

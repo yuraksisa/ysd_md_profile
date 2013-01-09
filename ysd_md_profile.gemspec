@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name    = "ysd_md_profile"
-  s.version = "0.2.0"
+  s.version = "0.2.1"
   s.authors = ["Yurak Sisa Dream"]
   s.date    = "2012-01-09"
   s.email   = ["yurak.sisa.dream@gmail.com"]
@@ -14,5 +14,6 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "ysd_md_business_events" # Business events   
   s.add_runtime_dependency "ysd_md_comparison"      # To build the conditions
   s.add_runtime_dependency "ysd_core_plugins"       # Aspects
+  s.add_runtime_dependency "ysd_md_configuration"   # Configuration
      
 end
