@@ -7,7 +7,7 @@ YSD_MD_PROFILE
 
 <ul>
   <li>Users::Profile</li>
-  <li>Users::UserGroup</li>
+  <li>Users::Group</li>
   <li>Users::ResourceAccessControlDataMapper</li>
   <li>Users::ResourceAccessControlPersistence</li>
 </ul>
@@ -16,7 +16,7 @@ YSD_MD_PROFILE
 
 <p>They represent the user accounts</p>
 
-<h2>Users::UserGroup</h2>
+<h2>Users::Group</h2>
 
 <p>They represent the user groups. An user can belong to a some user groups, and they will determinate which actions 
 can the user do or which documents can the user access</p>

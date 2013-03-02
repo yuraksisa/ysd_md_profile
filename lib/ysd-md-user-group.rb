@@ -3,9 +3,12 @@ require 'data_mapper' unless defined?DataMapper
 module Users
   
   #
-  # It represents the profile groups
+  # It represents a group of users.
   #
-  class UserGroup 
+  # A group is a way to organize users. The users can belong to some groups and this will
+  # help to define which actions can a user done.
+  #
+  class Group 
     include DataMapper::Resource
     
     storage_names[:default] = 'userds_groups'

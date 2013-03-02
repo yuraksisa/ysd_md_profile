@@ -1,73 +1,72 @@
-require 'ysd-persistence' if not defined?Persistence
-require 'digest/md5' unless defined?Digest
+require 'data_mapper' unless defined?DataMapper
 require 'ysd_md_comparison' unless defined?Conditions::Comparison
 require 'ysd-md-business_events' unless defined?BusinessEvents::BusinessEvent
 require 'ysd-plugins' unless defined?Plugins::ApplicableModelAspect
 require 'ysd_md_variable'
+require 'ysd_dm_finder'
+require 'ysd-md-user-group'
 
 module Users
 
-  # Defines an exception to check when the password is not valid
   #
-  class PasswordNotValid < RuntimeError; end
-
-  # Defines an exception to check when the email does not exist
-  # 
-  class EmailNotExist < RuntimeError; end
-
-  #
-  # This represents a user profile  
-  #
+  # This is the base class of all user profiles
   #
   class Profile
-    include Persistence::Resource
-    extend Plugins::ApplicableModelAspect         # Extends the entity to allow apply aspects
+    include DataMapper::Resource
+    extend  Plugins::ApplicableModelAspect         # Extends the entity to allow apply aspects
+    extend  Yito::Model::Finder
+    
+    storage_names[:default] = 'userds_users'      
+
+    property :username, String, :field => 'username', :length => 20, :key => true             # The username
+    property :email, String, :field => 'email', :length => 50, :unique_index => :profile_mail # The user email
   
-    alias :base_attribute_set :attribute_set
+    property :full_name, String, :field => 'full_name', :length => 60                  # Full name 
+    property :date_of_birth, DateTime, :field => 'date_of_birth'                       # Date of birth
+    property :country_of_origin, String, :field => 'country_of_origin', :length => 80  # Country of origin
+    property :sex, String, :field => 'sex', :length => 1                               # Sex (0-male, 1-female)
+    property :about_me, Text, :field => 'about_me'                                     # About me (information)
   
-    # Defines the Profile properties
-  
-    property :username, String             # The username
-    property :password, String             # The password (hashed)
-    property :salt, Object                 # Salt to check the password
-    property :email, String                # The user email
-  
-    property :full_name, String            # Full name 
-    property :date_of_birth, DateTime      # Date of birth
-    property :country_of_origin, String    # Country of origin
-    property :sex, String                  # Sex (0-male, 1-female)
-    property :about_me, String             # About me (information)
-  
-    property :preferred_language, String   # Preferred language
+    property :preferred_language, String, :field => 'preferred_language', :length => 2 # Preferred language
+
     property :creation_date, DateTime      # Creation date (auditory information)
     property :last_access, DateTime        # The last access to the system
     
-    property :superuser, Object            # It's a superuser
-    property :usergroups, Object           # An array with the list of the group which he/she belongs to
-        
-    # ================= Class methods ====================
+    property :superuser, Boolean, :field => 'superuser', :default => false             # It's a superuser
+
+    has n, :profile_groups, 'ProfileGroup', :child_key => [:profile_username], :parent_key => [:username], :constraint => :destroy
+    has n, :usergroups, 'Group', :through => :profile_groups, :via => :group
+
+    property :type, Discriminator        # The profile type
+
+    alias old_save save
     
     #
-    # Finds all profiles
-    #
-    def self.find_all(count=true)
-    
-      result = []
-    
-      result << Users::Profile.all
-      
-      if count
-        result << Users::Profile.count
+    # Override the save method to be sure the user and its groups are saved in a transaction
+    #    
+    def save
+
+      transaction do |t|
+        check_usergroups! if self.usergroups and (not self.usergroups.empty?)
+        old_save
+        t.commit
       end
-      
-      if result.length == 1
-        result = result.first
-      end
-      
-      result
-    
+
     end
-    
+
+    before :create do 
+
+      self.creation_date = Time.now
+        if usergroups.empty?
+          usergroups << SystemConfiguration::Variable.get_value('profile.default_group', 'user').split(",").map do |group|
+                           Group.get(group)
+                        end
+      end
+
+    end
+
+    # ================= Class methods ====================
+        
     #
     # Find profiles excluding the username passed as argument
     #
@@ -80,176 +79,31 @@ module Users
     #   The first element is the profile subset limited by limit, offset
     #   The second element is the total number of profiles which matches
     #
-    def self.find_other_profiles(username, limit, offset)
-    
-        # Query for the profiles
-        conditions = Conditions::Comparison.new(:username, '$ne', username)
+    def self.find_other_profiles(connected_username, limit, offset)
          
         result = [] 
          
-        result << Users::Profile.all(:conditions => conditions, 
-                                     :order=>[['photo.path',:desc]], 
+        result << Users::Profile.all(:conditions => {:username.not => connected_username}, 
+                                     :order=>[:photo_path.desc], 
                                      :limit => limit , 
                                      :offset => offset)    
     
-        result << Users::Profile.count(:conditions => conditions)
+        result << Users::Profile.count(:conditions => {:username.not => connected_username})
 
         result
     
     end
-    
+     
     #
-    # Login the user 
-    #
-    # @param [String] username
-    # @param [String] password
-    # @result [Profile] 
-    #   The connected user
-    #
-    def self.login(username, password)
-      user = get(username)
-      
-      # checks the password
-      if user
-        user = user.check_password(password)?user:nil
-      end
-      
-      # update the last access 
-      if user
-        user.attribute_set(:last_access, Time.now)
-        user.update
-      end
-      user
-    end
-
-    #
-    # Profile signup (creates a new profile through the signup process)
+    # Updates the last access
     # 
-    #
-    def self.signup(data)
-  
-      user_password = data['password']
-      
-      # Create the profile
-      profile = Profile.new(data['username'], data)
-      profile.create
-    
-      # Notifies that the profile has been created
-      if defined?BusinessEvents
-        BusinessEvents::BusinessEvent.fire_event(:profile_signup, {:username => profile.username, :password => user_password})
-      end
+    def update_last_access
 
-      return profile
-  
-    end  
-    
-    # Resets the user password
-    #  
-    # @param [String] email
-    #   The user email
-    #
-    # @throw EmailNotExist
-    #   If it doesn't exist a profile with this email
-    #    
-    def self.reset_password!(email)
-     
-      profile = Profile.all({:conditions => Conditions::Comparison.new(:email, '$eq', email)}).first
-     
-      if (profile)
-  
-        new_password = random_string(8)     
-        profile.set_password(new_password)
-        profile.update
-     
-        # Notifies that the password has been reset
-        if defined?BusinessEvents
-          BusinessEvents::BusinessEvent.fire_event(:profile_reset_password, {:username => profile.username, :password => new_password})
-        end
-       
-      else
-        raise EmailNotExist, "The email does not exists"
-      end
-      
-    end    
-    
-    # Check if the email is registered in the system
-    #
-    # @param [String] email
-    #   The user email
-    #
-    # @return [Boolean]
-    #   If the mail is registered or not in the system
-    #
-    #
-    def self.email_registered?(email)
-    
-      Users::Profile.all(:fields=>[:email], :conditions=> Conditions::Comparison.new(:email, '$eq', email), :limit => 1).length>0
-     
-    end
-
-    # =================================================
-
-    # Overwritten to hash the password
-    #
-    def initialize(path, metadata={})
-      
-      password = if metadata.has_key?(:password)
-                   metadata.delete(:password)
-                 else
-                   metadata.delete('password')
-                 end
-
-      super(path, metadata)
-      
-      if password
-        set_password(password)
-      end    
-      
-    end
-  
-    def attributes=(attributes)
-
-      password = if attributes.has_key?(:password)
-                   attributes.delete(:password)
-                 else
-                   attributes.delete('password')
-                 end
-      
-      super(attributes)
-      
-      if password
-        attribute_set(:password, password)
-      end
+       last_access = Time.now
+       save
 
     end
 
-    # Overwritten to hash the password 
-    #
-    def attribute_set(name, value)  
-      if (name.to_sym == :password)
-        set_password(value)
-      else
-        super(name, value)
-      end    
-    end
-  
-    # Overwritten to store auditory data
-    #
-    def create
-      attribute_set(:creation_date, Time.now)
-
-      if superuser.nil? or superuser == ''
-        attribute_set(:superuser, false)
-      end
-
-      if usergroups.nil? or usergroups == []
-        attribute_set(:usergroups, SystemConfiguration::Variable.get_value('profile.default_group', 'user').split(",") ) 
-      end
-
-      super
-    
-    end 
-          
     #
     # Calculates the age
     #
@@ -283,7 +137,7 @@ module Users
 
       end
  
-      age
+      return age
    
     end
     
@@ -292,129 +146,86 @@ module Users
     #
     def is_superuser?
     
-      attribute_get('superuser') == true
+      superuser == true
     
     end
 
     #
     # Check if the user belongs to the group(s)
     #
+    # @return [Boolean] true if the user belongs to the usergroup
+    #
     def belongs_to?(usergroup)
 
-      usergroups.any? {|g| g == usergroup}
+      usergroups.map{|group| group.group}.include?(usergroup)
+    end
+  
+    #
+    # Exporting the profile
+    #  
+    def as_json(options={})
+
+      methods = options[:methods] || []
+      methods << :age
+
+      relationships = options[:relationships] || {}
+      relationships.store(:usergroups, {})
+
+      super(options.merge(:methods => methods, :relationships => relationships))
 
     end
-    
-    #
-    # Gets the usergroups (make sure return array)
-    #
-    def usergroups
-    
-      value = attribute_get(:usergroups)
-      
-      if not value.kind_of?(Array)
-        value = []
-      end
-      
-      value
-   
-    end
-    
-    # Serializes the object to json
-    # Avoid sending the password and some problematic information
-    # 
-    def to_json(options={})
- 
-      remove_attributes = [:password] 
-      data = attributes.reject do |key, value| remove_attributes.index(key) end
-      data.store(:age, age)
-      data.store(:usergroups, usergroups)
-    
-      data.to_json
   
-    end 
-  
-    # Check if the password matches the user password
-    # 
-    # @param [String] check_this_password
-    #    The password to validate
+    # Check if the email is registered in the system
+    #
+    # @param [String] email
+    #   The user email
     #
     # @return [Boolean]
-    #    True if the password is right
+    #   If the mail is registered or not in the system
     #
-    def check_password(check_this_password)
-      salt = attribute_get(:salt)
-      attribute_get(:password) == Digest::MD5.hexdigest("#{salt}--#{check_this_password}")
-    end
-   
-    # Change the password, but first it checks the password matches the current profile password
     #
-    # @param [String] password
-    #    The current password
-    # @param [String] new_password
-    #    The new password
-    # 
-    # @raise [PasswordNotValid] 
-    #    If the password does not match the user password
-    #
-    def change_password!(password, new_password) 
-    
-      if (check_password(password)) 
-        set_password(new_password)
-        update
-      else
-        raise PasswordNotValid, "The password is not valid"
-      end
+    def self.email_registered?(email)
+      
+      Users::Profile.count(:email => email) > 0
+
+    end  
+
+    # ============ Resource info interface =================
      
-    end
-  
-    # Sets the password
     #
-    # @param [String] password
-    #    The user password
-    #
-    def set_password(password)
-      salt, hash_password = hash_password(password)    
-      base_attribute_set(:password, hash_password)
-      attribute_set(:salt, salt) 
+    # Get the resource information
+    # 
+    def resource_info
+
+      "profile_#{key}"
+
     end
+
+    def self.ANONYMOUS_USER
+     
+      Users::Profile.new({:username => 'anonymous', :superuser => false, :full_name=> 'Anonymous', 
+                          :usergroups => [Users::Group.new({:group => 'anonymous'})]
+                          })
    
+    end
+
     private
-  
-    # Hash the user password 
+    
     #
-    # @param [String] password
-    #  the password to hash
+    # Check the user groups
     #
-    # @returns [Array] salt, password
-    #  An array of two elements, the salt and the password
-    #
-    def hash_password(password) 
-  
-      # Generates a salt and calculates the hash
-      salt = self.class.random_string(5)
-      enc_password = Digest::MD5.hexdigest("#{salt}--#{password}")
-  
-      [salt, enc_password]
-  
+    def check_usergroups!
+
+      self.usergroups.map! do |ug|
+        if (not ug.saved?) and loaded_usergroup = Users::Group.get(ug.group)
+          loaded_usergroup
+        else
+          ug
+        end 
+      end
+
     end
- 
-    # Generates a random string of the requested size
-    #
-    # @param [Size] Integer
-    #   The string lenght
-    #
-    def self.random_string(size)
-
-      o=('a'..'z').to_a + ('A'..'Z').to_a
-      (1..size).map do o[rand(o.length)] end.join
-
- 
-    end
-   
-    public
-
-    ANONYMOUS_USER = new('anonymous', {:username => 'anonymous', :usergroups => ['anonymous']})
 
   end # Profile   
+  
 end # Users

@@ -1,2 +1,5 @@
 require 'ysd-md-user-group'
 require 'ysd-md-user-profile'
+require 'ysd-md-user-profile_group'
+require 'ysd-md-user-registered_profile'
+require 'ysd-md-user-connected_user'
