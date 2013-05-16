@@ -38,8 +38,6 @@ module Users
     has n, :usergroups, 'Group', :through => :profile_groups, :via => :group
 
     property :type, Discriminator        # The profile type
-
-    alias old_save save
     
     #
     # Override the save method to be sure the user and its groups are saved in a transaction
@@ -48,7 +46,7 @@ module Users
 
       transaction do |t|
         check_usergroups! if self.usergroups and (not self.usergroups.empty?)
-        old_save
+        super
         t.commit
       end
 
@@ -58,9 +56,11 @@ module Users
 
       self.creation_date = Time.now
         if usergroups.empty?
-          usergroups << SystemConfiguration::Variable.get_value('profile.default_group', 'user').split(",").map do |group|
-                           Group.get(group)
-                        end
+          SystemConfiguration::Variable.get_value('profile.default_group', 'user').split(",").each do |group|
+             if ug = Group.get(group)
+               usergroups << ug
+             end
+          end
       end
 
     end
@@ -83,12 +83,12 @@ module Users
          
         result = [] 
          
-        result << Users::Profile.all(:conditions => {:username.not => connected_username}, 
+        result << Users::Profile.all(:conditions => {:username.not => [connected_username,'admin'] }, 
                                      :order=>[:photo_path.desc], 
                                      :limit => limit , 
                                      :offset => offset)    
     
-        result << Users::Profile.count(:conditions => {:username.not => connected_username})
+        result << Users::Profile.count(:conditions => {:username.not => [connected_username,'admin']})
 
         result
     
@@ -119,12 +119,16 @@ module Users
 
           if _date_of_birth.is_a?(String)
             _date_of_birth = Time.parse(_date_of_birth)
+          else
+            if _date_of_birth.is_a?(DateTime)
+              _date_of_birth = date_of_birth.to_time
+            end
           end
 
           base  = Time.utc(1970,1,1)
           today = Time.now.utc
           
-          if _date_of_birth >= base
+          if _date_of_birth.to_time >= base
             age = Time.at(today-_date_of_birth).year-1970
           else   
             before_t = Time.at(base-_date_of_birth)
@@ -153,11 +157,17 @@ module Users
     #
     # Check if the user belongs to the group(s)
     #
+    # @param[String] usergroup to check if the user belongs to
     # @return [Boolean] true if the user belongs to the usergroup
     #
     def belongs_to?(usergroup)
 
-      usergroups.map{|group| group.group}.include?(usergroup)
+      if usergroup.is_a?Array
+        not (usergroup & (usergroups.map{|group| group.group})).empty?
+      else
+        usergroups.map{|group| group.group}.include?(usergroup)
+      end
+
     end
   
     #

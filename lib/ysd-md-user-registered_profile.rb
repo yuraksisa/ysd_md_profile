@@ -132,8 +132,8 @@ module Users
     # @param [Hash] attributes
     #
     def attributes=(attributes)
-       
-      attributes.symbolize_keys!
+
+      attributes.symbolize_keys! unless attributes.empty?
        
       password = if attributes.has_key?(:password)
                    attributes.delete(:password)
