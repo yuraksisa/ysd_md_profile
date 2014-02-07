@@ -83,11 +83,21 @@ module Users
          
         result = [] 
          
-        result << Users::Profile.all(:conditions => {:username.not => [connected_username,'admin'] }, 
-                                     :order=>[:photo_path.desc], 
-                                     :limit => limit , 
-                                     :offset => offset)    
-    
+        profiles = Users::Profile.all(:conditions => {:username.not => [connected_username,'admin'] }, 
+                                      :order=>[:photo_path.desc], 
+                                      :limit => limit , 
+                                      :offset => offset)    
+        
+        # Problem retrieving inherited profiles properties
+        # TODO ELIMINAR ESTA INFORMACION CUANDO ESTE COMPLETO EL PERFIL DE FB PORQUE
+        # SUPONE COSTE EXTRA
+        profiles.length.times do |item|
+         if profiles[item].class != Users::Profile
+           profiles[item].send(profiles[item].class.properties.select{ |p| p.model != Users::Profile }.first.name)  
+         end
+        end
+
+        result << profiles
         result << Users::Profile.count(:conditions => {:username.not => [connected_username,'admin']})
 
         result
