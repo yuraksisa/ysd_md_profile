@@ -84,7 +84,7 @@ module Users
         result = [] 
          
         profiles = Users::Profile.all(:conditions => {:username.not => [connected_username,'admin'] }, 
-                                      :order=>[:photo_path.desc], 
+                                      :order=>[:album_id.desc], 
                                       :limit => limit , 
                                       :offset => offset)    
         
