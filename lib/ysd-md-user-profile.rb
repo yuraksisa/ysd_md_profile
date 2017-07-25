@@ -38,7 +38,18 @@ module Users
     has n, :usergroups, 'Group', :through => :profile_groups, :via => :group
 
     property :type, Discriminator        # The profile type
+
+    property :api_key, String, length: 255     # Api Key
+    property :api_secret, String, length: 255  # Secret Key
     
+    #
+    # It generates a 48 characters key with number and letters to be used as api key and/or
+    # api secret
+    #
+    def self.generate_key
+      (('0'..'z').to_a.select {|item| item.match(/\w/) }).sample(48).join
+    end
+
     #
     # Override the save method to be sure the user and its groups are saved in a transaction
     #    
